@@ -1,0 +1,36 @@
+name: Terraform Validate, Plan & Apply
+on:
+  workflow_call:
+    inputs:
+      tf_directory:
+        description: "Path to Terraform code"
+        type: string
+        default: "./infra"
+      auto_apply:
+        description: "Apply automatically?"
+        type: boolean
+        default: false
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.6
+      - run: terraform -chdir=${{ inputs.tf_directory }} fmt -check
+      - run: terraform -chdir=${{ inputs.tf_directory }} init
+      - run: terraform -chdir=${{ inputs.tf_directory }} validate
+      - id: plan
+        run: terraform -chdir=${{ inputs.tf_directory }} plan -no-color
+      - if: ${{ inputs.auto_apply }}
+        run: terraform -chdir=${{ inputs.tf_directory }} apply -auto-approve
