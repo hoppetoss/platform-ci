@@ -1,0 +1,65 @@
+name: Docker Build and Push
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: "Name of the image to build"
+        required: true
+        type: string
+      registry:
+        description: "Docker registry (default ghcr.io)"
+        required: false
+        default: "ghcr.io"
+        type: string
+      dockerfile:
+        description: "Dockerfile path"
+        required: false
+        default: "Dockerfile"
+        type: string
+      context:
+        description: "Build context (default .)"
+        required: false
+        default: "."
+        type: string
+      build_args:
+        description: "Optional build arguments"
+        required: false
+        default: ""
+        type: string
+      push:
+        description: "Whether to push the image"
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      DOCKER_TOKEN:
+        required: true
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login
+        if: ${{ inputs.push }}
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login ${{ inputs.registry }} -u ${{ github.actor }} --password-stdin
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: ${{ inputs.push }}
+          tags: |
+            ${{ inputs.registry }}/${{ github.repository_owner }}/${{ inputs.image_name }}:latest
+            ${{ inputs.registry }}/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+          build-args: ${{ inputs.build_args }}
